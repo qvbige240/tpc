@@ -4,7 +4,27 @@ include env.conf
 
 ROOT=$(shell /bin/pwd)
 
+CC=gcc
+STRIP=strip
+
+ifeq ($(DIR_PJSIP), )
 DIR_PJSIP=$(ROOT)/..
+endif
+
+#test:
+	echo "======$(DIR_PJSIP)"
+	@echo "======WORKDIR: $(WORKDIR) "
+	@echo "======WORKDIR: ${WORKDIR} "
+	@echo "======DIR_PREMAKE: $(DIR_PREMAKE)"
+	@echo "======DIR_PREMAKE: ${DIR_PREMAKE}"
+	@echo "========BUILD_PATH: $(BUILD_PATH)"
+	@echo "========FINAL_PATH: $(FINAL_PATH)"
+	@echo "========GBASE_LIB: $(GBASE_LIB)"
+	@echo "========GBASE_INCLUDE: $(GBASE_INCLUDE)"
+	@echo "========GOLBAL_CFLAGS: $(GOLBAL_CFLAGS)"
+	@echo "========GOLBAL_CPPFLAGS: $(GOLBAL_CPPFLAGS)"
+	@echo "========GOLBAL_LDFLAGS: $(GOLBAL_LDFLAGS)"
+	@echo "========platform: $platform"
 
 INSTALL_PJ=$(DIR_PJSIP)/final_x86
 LIB_PJ = $(INSTALL_PJ)/lib
@@ -12,12 +32,11 @@ LIB_ZLOG = $(ROOT)/lib/x86
 LIB_SYS = /usr/lib
 INC_PJ = $(INSTALL_PJ)/include
 INC1 = $(ROOT)
-INC2 = $(ROOT)/inc
-INCSYS = /usr/include
+INC_TPC = $(ROOT)/inc
+INC_SYS = /usr/include
 
-CC=gcc -g -O0 -DUSE_ZLOG -I$(INC_PJ) -I$(INC1) -I$(INC2) -I$(INCSYS)
+TPC_CFLAGS=-g -O0 -DUSE_ZLOG -I$(INC_PJ) -I$(INC1) -I$(INC_TPC) -I$(INC_SYS)
 WEC_LDFLAGS=-L$(LIB_PJ) -L$(LIB_ZLOG) -L$(LIB_SYS)
-STRIP=strip
 
 TARGET = libtpc.so
 SRCS := tpc_endpoints.c  tpc_epoll.c  tpc_event.c  tpc_event_map.c  tpc_event_msg.c  tpc_event_thread.c  tpc_util.c ice_client.c
@@ -37,7 +56,7 @@ STATIC_LIB += $(LIB_ZLOG)/libzlog.a
 LIBS= -lcrypto -lpthread -ldl -lm
 
 all: 
-	$(CC) -shared -fPIC $(WEC_LDFLAGS) $(SRCS) -o $(TARGET) $(STATIC_LIB) $(LIBS)
+	$(CC) -shared -fPIC $(TPC_CFLAGS) $(WEC_LDFLAGS) $(SRCS) -o $(TARGET) $(STATIC_LIB) $(LIBS)
 #	$(STRIP) $(TARGET) 
 
 clean:
@@ -50,3 +69,10 @@ clean:
 	rm -f $(TARGET)	
 	rm -f *.gdb
 	rm -f *.bak
+
+install:
+	mkdir -p $(FINAL_PATH)/include/tpc/
+	cp -RLf $(INC_TPC)/* $(FINAL_PATH)/include/tpc/
+	cp -af $(TARGET)  $(FINAL_PATH)/lib
+#	install -d $(FINAL_PATH)
+

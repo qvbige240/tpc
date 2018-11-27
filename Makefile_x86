@@ -4,8 +4,8 @@ include env.conf
 
 ROOT=$(shell /bin/pwd)
 
-#CC=gcc
-#STRIP=strip
+CC=gcc
+STRIP=strip
 
 ifeq ($(DIR_PJSIP), )
 DIR_PJSIP=$(ROOT)/..
@@ -18,39 +18,30 @@ endif
 	@echo "======DIR_PREMAKE: $(DIR_PREMAKE)"
 	@echo "======DIR_PREMAKE: ${DIR_PREMAKE}"
 	@echo "========BUILD_PATH: $(BUILD_PATH)"
-	@echo "========BUILD_PATH: ${BUILD_PATH}"
 	@echo "========FINAL_PATH: $(FINAL_PATH)"
 	@echo "========GBASE_LIB: $(GBASE_LIB)"
 	@echo "========GBASE_INCLUDE: $(GBASE_INCLUDE)"
 	@echo "========GOLBAL_CFLAGS: $(GOLBAL_CFLAGS)"
 	@echo "========GOLBAL_CPPFLAGS: $(GOLBAL_CPPFLAGS)"
 	@echo "========GOLBAL_LDFLAGS: $(GOLBAL_LDFLAGS)"
-	@echo "========PLATFORM: $(PLATFORM)"
-	@echo "========CC: $(CC)"
+	@echo "========platform: $(PLATFORM)"
 
-#ifeq ($(PLATFORM), x86)
-#INSTALL_PJ=$(DIR_PJSIP)/final_x86
-#else ifeq ($(PLATFORM), nt966x)
-#INSTALL_PJ=$(DIR_PJSIP)/final_nt966x
-#endif
-
-INSTALL_PJ=$(DIR_PJSIP)/final_$(PLATFORM)
+INSTALL_PJ=$(DIR_PJSIP)/final_x86
 LIB_PJ = $(INSTALL_PJ)/lib
+LIB_ZLOG = $(ROOT)/lib/x86
+LIB_SYS = /usr/lib
 INC_PJ = $(INSTALL_PJ)/include
-INC = $(ROOT)
+INC1 = $(ROOT)
 INC_TPC = $(ROOT)/inc
-#INC_SYS = /usr/include
-#LIB_SYS = /usr/lib
+INC_SYS = /usr/include
 
-#TPC_CFLAGS=-g -O0 -DUSE_ZLOG -I$(INC_PJ) -I$(INC1) -I$(INC_TPC) -I$(INC_SYS)
-#WEC_LDFLAGS=-L$(GBASE_LIB) -L$(LIB_PJ)  
-TPC_CFLAGS=-g -O0 -DUSE_ZLOG -I$(INC_PJ) -I$(INC) -I$(INC_TPC) $(GOLBAL_CFLAGS)
-WEC_LDFLAGS=$(GOLBAL_LDFLAGS) -L$(LIB_PJ)
+TPC_CFLAGS=-g -O0 -DUSE_ZLOG -I$(INC_PJ) -I$(INC1) -I$(INC_TPC) -I$(INC_SYS)
+WEC_LDFLAGS=-L$(LIB_PJ) -L$(LIB_ZLOG) -L$(LIB_SYS)
 
 TARGET = libtpc.so
 SRCS := tpc_endpoints.c  tpc_epoll.c  tpc_event.c  tpc_event_map.c  tpc_event_msg.c  tpc_event_thread.c  tpc_util.c ice_client.c
 
-DEPEND_LIB = $(LIB_PJ)/libpjsua-x86_64-unknown-linux-gnu.a \
+STATIC_LIB = $(LIB_PJ)/libpjsua-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libpjsip-ua-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libpjsip-simple-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libpjsip-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libpjmedia-codec-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libpjmedia-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libpjmedia-videodev-x86_64-unknown-linux-gnu.a \
@@ -60,18 +51,12 @@ $(LIB_PJ)/libsrtp-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libresample-x86_64-unknow
 $(LIB_PJ)/libgsmcodec-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libspeex-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libilbccodec-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libwebrtc-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libpj-x86_64-unknown-linux-gnu.a
+STATIC_LIB += $(LIB_ZLOG)/libzlog.a
 
-LIB_ZLOG   = $(FINAL_PATH)/lib/libzlog.a
-LIB_CRYPTO = $(FINAL_PATH)/lib/libcrypto.a
-#STATIC_LIB += $(LIB_ZLOG) 
-#STATIC_LIB += $(LIB_CRYPTO)
-
-#LIBS= -lcrypto -lpthread -ldl -lm
-LIBS= -lpthread -ldl -lm
+LIBS= -lcrypto -lpthread -ldl -lm
 
 all: 
-	$(CC) -shared -fPIC $(TPC_CFLAGS) $(WEC_LDFLAGS) $(SRCS) -o $(TARGET) $(DEPEND_LIB)
-#	$(CC) -shared -fPIC $(TPC_CFLAGS) $(WEC_LDFLAGS) $(SRCS) -o $(TARGET) $(STATIC_LIB) $(LIBS)
+	$(CC) -shared -fPIC $(TPC_CFLAGS) $(WEC_LDFLAGS) $(SRCS) -o $(TARGET) $(STATIC_LIB) $(LIBS)
 #	$(STRIP) $(TARGET) 
 
 clean:

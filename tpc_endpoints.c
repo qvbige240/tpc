@@ -108,6 +108,11 @@ int tpc_packet_send(const void *pkt, size_t size)
 	return ice_packet_send(pkt, size);
 }
 
+void tpc_endpoints_disconnect(void)
+{
+	ice_client_disconnect();
+}
+
 int tpc_endpoints_destroy(void)
 {
 	return ice_client_destroy();

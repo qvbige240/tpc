@@ -78,6 +78,12 @@ typedef struct iclient_callback
 {
 	void (*on_connect_success)(void *ctx, void *param);
 
+	void (*on_sock_disconnect)(void *ctx, void *param);
+
+	void (*on_socket_clearing)(void *ctx, void *param);
+
+	void (*on_socket_writable)(void *ctx, void *param);
+
 	void (*on_receive_message)(void *ctx, void *pkt, pj_ssize_t bytes_read);
 } iclient_callback;
 
@@ -183,11 +189,17 @@ pj_status_t ice_client_register(iclient_callback *ctx);
 
 void ice_make_connect(char *uri);
 
+void ice_client_disconnect(void);
+
 pj_status_t ice_packet_send(const void *pkt, pj_size_t size);
 
 pj_status_t ice_client_destroy(void);
 
 void ice_client_status(void);
+
+pj_pool_t* ice_pool_get(void);
+
+pj_pool_t* ice_pool_create(const char *name, pj_size_t init_size, pj_size_t increment);
 
 PJ_END_DECL
 

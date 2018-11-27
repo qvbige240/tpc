@@ -286,7 +286,7 @@ char* pj_strdup0(pj_pool_t *pool, char **dst, const char *src)
 {
 	pj_ssize_t slen = src ? pj_ansi_strlen(src) : 0;
 	if (slen) {
-		*dst = (char*)pj_pool_alloc(pool, slen);
+		*dst = (char*)pj_pool_zalloc(pool, slen+1);
 		pj_memcpy(*dst, src, slen);
 	} else {
 		*dst = NULL;
@@ -312,10 +312,14 @@ static pj_status_t set_args(ice_info_t *param)
 	sprintf(id_tmp, "sip:%s@%s", info->account, info->server);
 	sprintf(turn_tmp, "%s:%s", info->turn, info->turn_port);
 	sprintf(url_tmp, "sip:%s", info->server);
+	//printf("======id_tmp: %s, turn_tmp: %s, url_tmp: %s\n", id_tmp, turn_tmp, url_tmp);
+
 	//char* id = "sip:102@172.17.13.8";
 	pj_strdup0(app_config.pool, &id, id_tmp);
 	pj_strdup0(app_config.pool, &turn, turn_tmp);
 	pj_strdup0(app_config.pool, &url, url_tmp);
+
+	printf("======id: %s, turn: %s, url: %s\n", id, turn, url);
 
 	/* id */
 	if (pjsua_verify_url(id) != 0) {
@@ -408,6 +412,14 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
 	if (call_info.state == PJSIP_INV_STATE_DISCONNECTED) {
 		///* Stop all ringback for this call */
 		//ring_stop(call_id);
+
+		socket_client *client = (socket_client *)app_config.client;
+		client->connected = 0;
+		if (client && client->cb.on_socket_clearing) {
+			client->cb.on_socket_clearing(client->ctx, NULL);
+		} else {
+			PJ_LOG(3, (THIS_FILE, "on_socket_clearing: without register or null pointer."));
+		}
 
 		/* Cancel duration timer, if any */
 		if (app_config.call_data[call_id].timer.id != PJSUA_INVALID_ID) {
@@ -571,6 +583,44 @@ static void on_ice_connection_success(void *tp, void *param)
 }
 
 /*
+ * socket disconnect.
+ */
+static void on_ice_socket_disconnect(void *tp, void *param)
+{
+	socket_client *client = (socket_client *)app_config.client;
+
+	PJ_LOG(4, (THIS_FILE, "========ice socket disconnect."));
+	pjsua_call_hangup(current_call, 0, NULL, NULL);
+	if (tp && client) {
+		client->connected = 0;
+		if (client->cb.on_sock_disconnect)
+			client->cb.on_sock_disconnect(client->ctx, NULL);
+		else
+			PJ_LOG(3, (THIS_FILE, "without register callback function: on_sock_disconnect."));
+	} else {
+		PJ_LOG(3, (THIS_FILE, "null pointer error."));
+	}
+}
+
+/*
+ * socket can write data to fd
+ */
+static void on_ice_socket_writable(void *tp, void *param)
+{
+	socket_client *client = (socket_client *)app_config.client;
+
+	PJ_LOG(4, (THIS_FILE, "========ice socket writable."));
+	if (tp && client) {
+		if (client->cb.on_socket_writable)
+			client->cb.on_socket_writable(client->ctx, NULL);
+		else
+			PJ_LOG(3, (THIS_FILE, "without register callback function: on_socket_writable."));
+	} else {
+		PJ_LOG(3, (THIS_FILE, "null pointer error."));
+	}
+}
+
+/*
  * ice receive message callback.
  */
 static void on_ice_receive_message(void *data, void *pkt, pj_ssize_t bytes_read)
@@ -605,7 +655,7 @@ static void call_timeout_callback(pj_timer_heap_t *timer_heap, struct pj_timer_e
 	pj_list_push_back(&msg_data_.hdr_list, &warn);
 
 	/* Call duration has been exceeded; disconnect the call */
-	PJ_LOG(3,(THIS_FILE, "Duration (%d seconds) has been exceeded "
+	PJ_LOG(3,(THIS_FILE, "============Duration (%d seconds) has been exceeded "
 		"for call %d, disconnecting the call", app_config.duration, call_id));
 	entry->id = PJSUA_INVALID_ID;
 	pjsua_call_hangup(call_id, 200, NULL, &msg_data_);
@@ -678,6 +728,8 @@ pj_status_t ice_client_init(ice_info_t *info)
 
 	app_config.cfg.cb.on_ice_negotiation_success = &on_ice_negotiation_success;
 	app_config.cfg.cb.on_ice_connection_success = &on_ice_connection_success;
+	app_config.cfg.cb.on_ice_socket_disconnect = &on_ice_socket_disconnect;
+	app_config.cfg.cb.on_ice_socket_writable = &on_ice_socket_writable;
 	app_config.cfg.cb.on_ice_receive_message = &on_ice_receive_message;
 
 
@@ -854,6 +906,9 @@ pj_status_t ice_client_register(iclient_callback *ctx)
 
 	client->ctx = ctx;
 	client->cb.on_connect_success = ctx->on_connect_success;
+	client->cb.on_sock_disconnect = ctx->on_sock_disconnect;
+	client->cb.on_socket_clearing = ctx->on_socket_clearing;
+	client->cb.on_socket_writable = ctx->on_socket_writable;
 	client->cb.on_receive_message = ctx->on_receive_message;
 
 	status = pjsua_start();
@@ -890,6 +945,12 @@ pj_status_t ice_packet_send(const void *pkt, pj_size_t size)
 		status = pjmedia_transport_send_rtp(client->tp, pkt, size);
 
 	return status;
+}
+
+void ice_client_disconnect(void)
+{
+	/* Hangup current calls */
+	pjsua_call_hangup(current_call, 0, NULL, NULL);
 }
 
 pj_status_t ice_client_destroy(void)
@@ -935,4 +996,14 @@ pj_status_t ice_thread_register(const char *thread_name)
 		PJ_PERROR(4, (THIS_FILE, status, "ice_thread_register"));
 		//PJSUA2_RAISE_ERROR(status);
 	}
+}
+
+pj_pool_t* ice_pool_get()
+{
+	return app_config.pool;
+}
+
+pj_pool_t* ice_pool_create(const char *name, pj_size_t init_size, pj_size_t increment)
+{
+	return pjsua_pool_create(name, init_size, increment);
 }

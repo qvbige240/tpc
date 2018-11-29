@@ -14,7 +14,6 @@
 int tpc_endpoints_init(void *uid, int device)
 {
 	int ret = 0;
-	int external_network = 0;
 
 	ice_info_t info = {0};
 	char account[64] = {0};
@@ -26,10 +25,12 @@ int tpc_endpoints_init(void *uid, int device)
 		sprintf(account, "%sB", (char*)uid);		// ANDROID/IOS: uid+B
 
 	char *server = NULL;
-	if (external_network)
-		server = SERVER_EXTERNAL_NETWORK;
-	else
+
+#ifdef SIP_SERVER_INTERNAL
 		server = SERVER_INTERNAL_NETWORK;
+#else
+	server = SERVER_EXTERNAL_NETWORK;
+#endif
 
 	strcpy(info.account, account);
 	strcpy(info.passwd, account);
@@ -89,14 +90,15 @@ int tpc_endpoints_register(tpc_endpoints_op *callback)
 
 void tpc_endpoints_connect(void *uid)
 {
-	int external_network = 0;
 	char remote_uri[128] = {0};
 
 	char *server = NULL;
-	if (external_network)
-		server = SERVER_EXTERNAL_NETWORK;
-	else
+
+#ifdef SIP_SERVER_INTERNAL
 		server = SERVER_INTERNAL_NETWORK;
+#else
+	server = SERVER_EXTERNAL_NETWORK;
+#endif
 
 	sprintf(remote_uri, "sip:%sA@%s", (char*)uid, server);
 

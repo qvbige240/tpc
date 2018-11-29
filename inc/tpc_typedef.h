@@ -50,7 +50,7 @@
 
 #define TPCAPI			extern	
 
-#define TPC_CONFIG_ANDROID 0
+//#define TPC_CONFIG_ANDROID 0
 
 #if defined(TPC_CONFIG_ANDROID) && TPC_CONFIG_ANDROID==1
 

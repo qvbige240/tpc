@@ -8,8 +8,15 @@
 #include "ice_client.h"
 
 #include "tpc_endpoints.h"
-#define SERVER_INTERNAL_NETWORK		"172.17.13.8"#define SERVER_EXTERNAL_NETWORK		"222.209.88.97"
-
+#ifdef SIP_SERVER_DEVELOP_ENV
+#define SERVER_INTERNAL_NETWORK		"172.17.13.8"#define SERVER_EXTERNAL_NETWORK		"222.209.88.97"
+#define SERVER_REALM				"172.17.13.8"
+#elif SIP_SERVER_TEST_ENV
+#define SERVER_INTERNAL_NETWORK		"172.20.25.40"
+//#define SERVER_EXTERNAL_NETWORK		"115.182.105.80"
+#define SERVER_EXTERNAL_NETWORK		"p2ptest.91carnet.com"
+#define SERVER_REALM				"91carnet.com"
+#endif
 
 int tpc_endpoints_init(void *uid, int device)
 {
@@ -27,7 +34,7 @@ int tpc_endpoints_init(void *uid, int device)
 	char *server = NULL;
 
 #ifdef SIP_SERVER_INTERNAL
-		server = SERVER_INTERNAL_NETWORK;
+	server = SERVER_INTERNAL_NETWORK;
 #else
 	server = SERVER_EXTERNAL_NETWORK;
 #endif
@@ -35,7 +42,7 @@ int tpc_endpoints_init(void *uid, int device)
 	strcpy(info.account, account);
 	strcpy(info.passwd, account);
 	strcpy(info.server, server);
-	strcpy(info.realm, "172.17.13.8");
+	strcpy(info.realm, SERVER_REALM);
 
 	strcpy(info.turn, server);
 	strcpy(info.turn_port, "3488");
@@ -95,7 +102,7 @@ void tpc_endpoints_connect(void *uid)
 	char *server = NULL;
 
 #ifdef SIP_SERVER_INTERNAL
-		server = SERVER_INTERNAL_NETWORK;
+	server = SERVER_INTERNAL_NETWORK;
 #else
 	server = SERVER_EXTERNAL_NETWORK;
 #endif

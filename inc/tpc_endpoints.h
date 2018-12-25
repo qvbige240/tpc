@@ -11,9 +11,21 @@
 
 TPC_BEGIN_DELS
 
+
+typedef struct tpc_endpoints_data
+{
+	int			conn_id;
+	int			status;
+
+} tpc_endpoints_data;
+
 typedef struct tpc_endpoints_op
 {
+	void (*on_register_status)(void *ctx, void *param);
+
 	void (*on_connect_success)(void *ctx, void *param);
+
+	void (*on_connect_failure)(void *ctx, void *param);
 
 	void (*on_sock_disconnect)(void *ctx, void *param);
 
@@ -28,7 +40,7 @@ TPCAPI int tpc_endpoints_init(void *uid, int device);
 
 int tpc_endpoints_register(tpc_endpoints_op *callback);
 
-void tpc_endpoints_connect(void *uid);
+int tpc_endpoints_connect(void *uid);
 
 int tpc_packet_send(const void *pkt, size_t size);
 

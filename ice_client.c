@@ -102,6 +102,9 @@ typedef struct socket_client
 
 	void				*tp;
 	int					connected;
+	int					nego_complete;
+
+	int					reg_status;
 } socket_client;
 
 
@@ -312,6 +315,7 @@ static pj_status_t set_args(ice_info_t *param)
 	sprintf(id_tmp, "sip:%s@%s", info->account, info->server);
 	sprintf(turn_tmp, "%s:%s", info->turn, info->turn_port);
 	sprintf(url_tmp, "sip:%s", info->server);
+	//sprintf(url_tmp, "sip:%s", "p2ptest.91carnet.com");
 	//sprintf(url_tmp, "sip:%s", "115.182.105.80");
 	//printf("======id_tmp: %s, turn_tmp: %s, url_tmp: %s\n", id_tmp, turn_tmp, url_tmp);
 
@@ -415,11 +419,41 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
 		//ring_stop(call_id);
 
 		socket_client *client = (socket_client *)app_config.client;
-		client->connected = 0;
-		if (client && client->cb.on_socket_clearing) {
-			client->cb.on_socket_clearing(client->ctx, NULL);
-		} else {
-			PJ_LOG(3, (THIS_FILE, "on_socket_clearing: without register or null pointer."));
+		if (client && !app_config.is_destroying) {
+			//if (app_config.is_destroying) return;
+
+			if (client->nego_complete) {
+				client->nego_complete = 0;
+				if (client->connected) {
+					client->connected = 0;
+					if (client->cb.on_sock_disconnect) {
+						client->cb.on_sock_disconnect(client->ctx, NULL);
+					} else {
+						PJ_LOG(3, (THIS_FILE, "without register callback: on_sock_disconnect."));
+					}
+				} else {
+					//client->connected = 0;
+					//if (client && client->cb.on_socket_clearing) {
+					//	client->cb.on_socket_clearing(client->ctx, NULL);
+					//} else {
+					//	PJ_LOG(3, (THIS_FILE, "on_socket_clearing: without register or null pointer."));
+					//}
+				}
+
+			} else {
+				PJ_LOG(3, (THIS_FILE, "=============================================="));
+				PJ_LOG(4, (THIS_FILE, "========ice connection failed: remote init or stun binding request."));
+				PJ_LOG(3, (THIS_FILE, "=============================================="));
+
+				ice_client_param param = {0};
+				param.call_id = call_id;
+				param.status = 490;
+				if (client->cb.on_connect_failure) {
+					client->cb.on_connect_failure(client->ctx, (void*)&param);
+				} else {
+					PJ_LOG(3, (THIS_FILE, "without register callback: on_connect_failure."));
+				}
+			}
 		}
 
 		/* Cancel duration timer, if any */
@@ -513,7 +547,10 @@ static void on_call_generic_media_state(pjsua_call_info *ci, unsigned mi,
 		"Active",
 		"Local hold",
 		"Remote hold",
-		"Error"
+		"Error",
+		"Error1(STUN)",
+		"Error2(PORT)",
+		"Error3(PUNCH)"
 	};
 
 	PJ_UNUSED_ARG(has_error);
@@ -523,6 +560,8 @@ static void on_call_generic_media_state(pjsua_call_info *ci, unsigned mi,
 
 	PJ_LOG(4,(THIS_FILE, "============Call %d media %d [type=%s], status is %s",
 		ci->id, mi, pjmedia_type_name(ci->media[mi].type), status_name[ci->media[mi].status]));
+	PJ_LOG(4,(THIS_FILE, "============Call %d prov_media %d [type=%s], status is %s",
+		ci->id, mi, pjmedia_type_name(ci->prov_media[mi].type), status_name[ci->prov_media[mi].status]));
 }
 static void on_call_media_state(pjsua_call_id call_id)
 {
@@ -578,8 +617,42 @@ static void on_incoming_call(pjsua_acc_id acc_id, pjsua_call_id call_id, pjsip_r
  */
 static void on_reg_state(pjsua_acc_id acc_id)
 {
-	PJ_UNUSED_ARG(acc_id);
+	//PJ_UNUSED_ARG(acc_id);
+	char buf[80];
+	pjsua_acc_info info;
 
+	if (app_config.is_destroying) return;
+
+	pjsua_acc_get_info(acc_id, &info);
+
+	if (!info.has_registration) {
+		pj_ansi_snprintf(buf, sizeof(buf), "%.*s",
+			(int)info.status_text.slen,
+			info.status_text.ptr);
+
+	} else {
+		pj_ansi_snprintf(buf, sizeof(buf),
+			"%d/%.*s (expires=%d)",
+			info.status,
+			(int)info.status_text.slen,
+			info.status_text.ptr,
+			info.expires);
+	}
+
+	PJ_LOG(4, (THIS_FILE, "=============== %c[%2d] %.*s: %s ===============\n", 
+		(acc_id==current_acc?'*':' '), acc_id, (int)info.acc_uri.slen, info.acc_uri.ptr, buf));
+
+	socket_client *client = (socket_client *)app_config.client;
+	if (client->cb.on_register_status) {
+		ice_client_param param = {0};
+		param.call_id = acc_id;
+		param.status = info.status;
+		if (info.status != client->reg_status)
+			client->cb.on_register_status(client->ctx, (void*)&param);
+	} else {
+		PJ_LOG(3, (THIS_FILE, "without register callback: on_register_status."));
+	}
+	client->reg_status = info.status;
 	// Log already written.
 }
 
@@ -598,9 +671,17 @@ static void on_nat_detect(const pj_stun_nat_detect_result *res)
 /*
  * ice negotiation success callback.
  */
-static void on_ice_negotiation_success(void *ctx, void *param)
+static void on_ice_negotiation_success(void *tp, void *param)
 {
 	PJ_LOG(4, (THIS_FILE, "========ice negotiation success."));
+	socket_client *client = (socket_client *)app_config.client;
+	if (app_config.is_destroying) return;
+
+	if (tp && client) {
+		client->nego_complete = 1;
+	} else {
+		PJ_LOG(3, (THIS_FILE, "null pointer error."));
+	}
 }
 
 /*
@@ -609,6 +690,7 @@ static void on_ice_negotiation_success(void *ctx, void *param)
 static void on_ice_connection_success(void *tp, void *param)
 {
 	socket_client *client = (socket_client *)app_config.client;
+	if (app_config.is_destroying) return;
 
 	PJ_LOG(4, (THIS_FILE, "========ice connection success."));
 	if (tp && client) {
@@ -624,11 +706,75 @@ static void on_ice_connection_success(void *tp, void *param)
 }
 
 /*
+ * ice connect failed callback.
+ */
+static void on_ice_connection_failed(void *tp, void *param)
+{
+	const char *status_name[] = {
+		"None",
+		"Active",
+		"Local hold",
+		"Remote hold",
+		"Error",
+		"Error1(STUN)",
+		"Error2(PORT)",
+		"Error3(PUNCH)"
+	};
+
+	socket_client *client = (socket_client *)app_config.client;
+	if (app_config.is_destroying) return;
+	
+	pjsua_callback_param *p = (pjsua_callback_param *)param;
+	int state = p->status;
+	pjsua_call_id call_id = p->call_id;
+	int code = 0;
+
+	PJ_LOG(3, (THIS_FILE, "=============================================="));
+	PJ_LOG(4, (THIS_FILE, "========ice connection failed: %s.", status_name[state]));
+	PJ_LOG(3, (THIS_FILE, "=============================================="));
+	if (state == PJSUA_CALL_MEDIA_ERROR) {
+		client->nego_complete = 1;
+
+		code = 500;
+		pj_str_t reason = pj_str("ICE failed NEGOTIATION");
+		pjsua_call_hangup(call_id, 500, &reason, NULL);
+	} else if (state == PJSUA_CALL_MEDIA_ERROR1) {
+
+		//pj_str_t reason = pj_str("ICE STUN binding request failed");
+		//pjsua_call_hangup(call_id, 480, &reason, NULL);
+	} else if (state == PJSUA_CALL_MEDIA_ERROR2) {
+		code = 491;
+		pj_str_t reason = pj_str("ICE failed tcp port bind");
+		pjsua_call_hangup(call_id, 490, &reason, NULL);
+	} else if (state == PJSUA_CALL_MEDIA_ERROR3) {
+		code = 492;
+		pj_str_t reason = pj_str("ICE failed tcp connect");
+		pjsua_call_hangup(call_id, 491, &reason, NULL);
+	}
+
+	if (tp && client) {
+		//client->tp = tp;
+		//client->connected = 0;
+		ice_client_param param = {0};
+		param.call_id = call_id;
+		param.status = code;
+		if (client->cb.on_connect_failure)
+			client->cb.on_connect_failure(client->ctx, (void*)&param);
+		else
+			PJ_LOG(3, (THIS_FILE, "without register callback: on_connect_failure."));
+	} else {
+		PJ_LOG(3, (THIS_FILE, "null pointer error."));
+	}
+}
+
+/*
  * socket disconnect.
  */
 static void on_ice_socket_disconnect(void *tp, void *param)
 {
 	socket_client *client = (socket_client *)app_config.client;
+
+	if (app_config.is_destroying) return;
 
 	PJ_LOG(4, (THIS_FILE, "========ice socket disconnect."));
 	pjsua_call_hangup(current_call, 0, NULL, NULL);
@@ -649,6 +795,7 @@ static void on_ice_socket_disconnect(void *tp, void *param)
 static void on_ice_socket_writable(void *tp, void *param)
 {
 	socket_client *client = (socket_client *)app_config.client;
+	if (app_config.is_destroying) return;
 
 	PJ_LOG(4, (THIS_FILE, "========ice socket writable."));
 	if (tp && client) {
@@ -667,6 +814,8 @@ static void on_ice_socket_writable(void *tp, void *param)
 static void on_ice_receive_message(void *data, void *pkt, pj_ssize_t bytes_read)
 {
 	socket_client *client = (socket_client *)app_config.client;
+	if (app_config.is_destroying) return;
+
 	if (client && client->cb.on_receive_message) {
 		client->cb.on_receive_message(client->ctx, pkt, bytes_read);
 	}
@@ -728,6 +877,8 @@ pj_status_t ice_client_init(ice_info_t *info)
 	//}
 	default_config();
 	app_config.client = (socket_client*)PJ_POOL_ZALLOC_T(app_config.pool, socket_client);
+	socket_client *client = app_config.client;
+	client->reg_status = -1;
 
 	//pj_log_set_level( 6 );
 	//ice_info_t info = {0};
@@ -770,6 +921,7 @@ pj_status_t ice_client_init(ice_info_t *info)
 
 	app_config.cfg.cb.on_ice_negotiation_success = &on_ice_negotiation_success;
 	app_config.cfg.cb.on_ice_connection_success = &on_ice_connection_success;
+	app_config.cfg.cb.on_ice_connection_failed = &on_ice_connection_failed;	
 	app_config.cfg.cb.on_ice_socket_disconnect = &on_ice_socket_disconnect;
 	app_config.cfg.cb.on_ice_socket_writable = &on_ice_socket_writable;
 	app_config.cfg.cb.on_ice_receive_message = &on_ice_receive_message;
@@ -947,7 +1099,9 @@ pj_status_t ice_client_register(iclient_callback *ctx)
 	PJ_ASSERT_RETURN(ctx, PJ_EINVAL);
 
 	client->ctx = ctx;
+	client->cb.on_register_status = ctx->on_register_status;
 	client->cb.on_connect_success = ctx->on_connect_success;
+	client->cb.on_connect_failure = ctx->on_connect_failure;
 	client->cb.on_sock_disconnect = ctx->on_sock_disconnect;
 	client->cb.on_socket_clearing = ctx->on_socket_clearing;
 	client->cb.on_socket_writable = ctx->on_socket_writable;
@@ -959,7 +1113,7 @@ pj_status_t ice_client_register(iclient_callback *ctx)
 }
 
 //void ice_make_connect(iclient_callback *ctx, char *uri)
-void ice_make_connect(char *uri)
+pj_status_t ice_make_connect(char *uri)
 {
 	//socket_client *client = NULL;
 	pjsua_msg_data msg_data_;
@@ -975,7 +1129,7 @@ void ice_make_connect(char *uri)
 
 	pjsua_msg_data_init(&msg_data_);
 	//TEST_MULTIPART(&msg_data_);
-	pjsua_call_make_call(current_acc, &tmp, &call_opt, NULL, &msg_data_, &current_call);
+	return pjsua_call_make_call(current_acc, &tmp, &call_opt, NULL, &msg_data_, &current_call);
 }
 
 pj_status_t ice_packet_send(const void *pkt, pj_size_t size)
@@ -998,6 +1152,8 @@ void ice_client_disconnect(void)
 pj_status_t ice_client_destroy(void)
 {
 	pj_status_t status = PJ_SUCCESS;
+
+	app_config.is_destroying = 1;
 
 	pj_pool_safe_release(&app_config.pool);
 

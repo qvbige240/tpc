@@ -74,9 +74,21 @@ typedef struct ice_info_s
 	int		conn_type;
 } ice_info_t;
 
+
+typedef struct ice_client_param
+{
+	int			call_id;
+	int			status;
+
+} ice_client_param;
+
 typedef struct iclient_callback
 {
+	void (*on_register_status)(void *ctx, void *param);
+
 	void (*on_connect_success)(void *ctx, void *param);
+
+	void (*on_connect_failure)(void *ctx, void *param);
 
 	void (*on_sock_disconnect)(void *ctx, void *param);
 
@@ -92,6 +104,7 @@ typedef struct pjsua_app_config
 {
 	//sip_context_t		sip_ctx;
 	void				*client;
+	int					is_destroying;
 
 	pjsua_config	    cfg;
 	pjsua_logging_config    log_cfg;
@@ -187,7 +200,7 @@ pj_status_t ice_client_init(ice_info_t *info);
 
 pj_status_t ice_client_register(iclient_callback *ctx);
 
-void ice_make_connect(char *uri);
+pj_status_t ice_make_connect(char *uri);
 
 void ice_client_disconnect(void);
 

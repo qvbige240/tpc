@@ -88,14 +88,15 @@ int tpc_endpoints_init(void *uid, int device)
 
 int tpc_endpoints_register(tpc_endpoints_op *callback)
 {
+	int status = 0;
 	iclient_callback *ctx = (iclient_callback *)callback;
 
-	ice_client_register(ctx);
+	status = ice_client_register(ctx);
 
-	return 0;
+	return status;
 }
 
-void tpc_endpoints_connect(void *uid)
+int tpc_endpoints_connect(void *uid)
 {
 	char remote_uri[128] = {0};
 
@@ -109,7 +110,7 @@ void tpc_endpoints_connect(void *uid)
 
 	sprintf(remote_uri, "sip:%sA@%s", (char*)uid, server);
 
-	ice_make_connect(remote_uri);
+	return ice_make_connect(remote_uri);
 }
 
 int tpc_packet_send(const void *pkt, size_t size)
@@ -134,5 +135,5 @@ void tpc_endpoints_status(void)
 
 int tpc_thread_register(const char *thread_name)
 {
-	ice_thread_register(thread_name);
+	return ice_thread_register(thread_name);
 }

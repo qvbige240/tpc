@@ -137,3 +137,8 @@ int tpc_thread_register(const char *thread_name)
 {
 	return ice_thread_register(thread_name);
 }
+
+int tpc_thread_is_registered(void)
+{
+	return ice_thread_is_registered();
+}

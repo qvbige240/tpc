@@ -52,6 +52,8 @@ void tpc_endpoints_status(void);
 
 int tpc_thread_register(const char *thread_name);
 
+int tpc_thread_is_registered(void);
+
 TPC_END_DELS
 
 #endif //TPC_ENDPOINTS_H

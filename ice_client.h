@@ -196,6 +196,8 @@ typedef struct pjsua_app_config
 
 pj_status_t ice_thread_register(const char *thread_name);
 
+pj_bool_t ice_thread_is_registered(void);
+
 pj_status_t ice_client_init(ice_info_t *info);
 
 pj_status_t ice_client_register(iclient_callback *ctx);

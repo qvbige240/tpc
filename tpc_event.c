@@ -233,7 +233,7 @@ static int event_add_internal(tpc_events* ev, const struct timeval* tv, int tv_i
 		else if (ev->ev_events & (TPC_EV_SIGNAL))
 			;	//...
 		else if (ev->ev_events & (TPC_EV_NOTICE))
-			tpc_evnotice_add(thiz, ev->ev_fd, ev);
+			ret = tpc_evnotice_add(thiz, ev->ev_fd, ev);
 
 		if (ret != -1)		//... ret = 0 ?
 			event_queue_insert(thiz, ev, TPC_EVLIST_INSERTED);	//...
@@ -473,7 +473,7 @@ static int event_process_active_single_queue(tpc_evbase_t *thiz, struct tpc_even
 			++count;
 
 		TPC_LOGD((
-			"event_process_active: event: %p, %s%s%s%scall %p",
+			"event_process_active event: %p, %s%s%s%scall %p",
 			ev,
 			ev->ev_result & TPC_EV_READ ? "TPC_EV_READ " : "",
 			ev->ev_result & TPC_EV_WRITE ? "TPC_EV_WRITE " : "",
@@ -529,6 +529,43 @@ static int event_process_active(tpc_evbase_t *thiz)
 	return 0;
 }
 
+int tpc_event_pending(const tpc_events *ev, short event, struct timeval *tv)
+{
+	int flags = 0;
+
+	if (!ev->ev_base) {
+		TPC_LOGE("%s: event has no event_base set.", __func__);
+		return -1;
+	}
+
+	TPC_EVACQUIRE_LOCK(ev->ev_base, th_base_lock);
+
+	if (ev->ev_flags & TPC_EVLIST_INSERTED)
+		flags |= (ev->ev_events & (TPC_EV_READ|TPC_EV_WRITE|TPC_EV_SIGNAL|TPC_EV_NOTICE));
+	if (ev->ev_flags & TPC_EVLIST_ACTIVE)
+		flags |= ev->ev_result;
+	if (ev->ev_flags & TPC_EVLIST_TIMEOUT)
+		flags |= TPC_EV_TIMEOUT;
+
+	event &= (TPC_EV_TIMEOUT|TPC_EV_READ|TPC_EV_WRITE|TPC_EV_SIGNAL|TPC_EV_NOTICE);
+
+	/* See if there is a timeout that we should report */
+	if (tv != NULL && (flags & event & TPC_EV_TIMEOUT)) {
+		struct timeval tmp = ev->ev_timeout;
+		tmp.tv_usec &=  0x000fffff;
+#if defined(TPC_HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+		/* correctly remamp to real time */
+		tpc_timeradd(&ev->ev_base->tv_clock_diff, &tmp, tv);
+#else
+		*tv = tmp;
+#endif
+	}
+
+	TPC_EVRELEASE_LOCK(ev->ev_base, th_base_lock);
+
+	return (flags & event);
+}
+
 int tpc_event_assign(tpc_events *ev, tpc_evbase_t *base, int fd, short events, tpc_event_callback callback, void *arg)
 {
 	if (!base) {
@@ -576,10 +613,23 @@ int tpc_event_assign(tpc_events *ev, tpc_evbase_t *base, int fd, short events, t
 	return 0;
 }
 
+int tpc_event_base_set(tpc_evbase_t *base, tpc_events *ev)
+{
+	/* Only innocent events may be assigned to a different base */
+	if (ev->ev_flags != TPC_EVLIST_INIT)
+		return (-1);
+
+	//_event_debug_assert_is_setup(ev);
+
+	ev->ev_base = base;
+	ev->ev_priority = base->nactivequeues/2;
+
+	return (0);
+}
+
 tpc_events *tpc_event_new(tpc_evbase_t *base, int fd, short events, tpc_event_callback callback, void *arg)
 {
-	tpc_events *ev;
-	ev = TPC_MALLOC(sizeof(tpc_events));
+	tpc_events *ev = TPC_MALLOC(sizeof(tpc_events));
 	if (ev) {
 		if (tpc_event_assign(ev, base, fd, events, callback, arg) < 0) {
 			TPC_FREE(ev);
@@ -711,6 +761,24 @@ tpc_evbase_t* tpc_evbase_create(void)
 	return base;
 }
 
+int tpc_evbase_loopbreak(tpc_evbase_t *event_base)
+{
+	int r = 0;
+	if (event_base == NULL)
+		return (-1);
+
+	TPC_EVACQUIRE_LOCK(event_base, th_base_lock);
+	event_base->event_break = 1;
+
+	if (TPC_EVBASE_NEED_NOTIFY(event_base)) {
+		r = event_thread_notify(event_base);
+	} else {
+		r = (0);
+	}
+	TPC_EVRELEASE_LOCK(event_base, th_base_lock);
+	return r;
+}
+
 int tpc_evbase_loop(tpc_evbase_t* thiz, int flags)
 {
 	struct timeval tv = {0};
@@ -731,6 +799,9 @@ int tpc_evbase_loop(tpc_evbase_t* thiz, int flags)
 
 	while (!done) {
 		tv_p = &tv;
+
+		if (thiz->event_break)
+			break;
 
 		TPC_LOGD(("=========111event_count_active %d event cnt %d", thiz->event_count_active, thiz->event_count));
 		if (!thiz->event_count_active) {
@@ -765,7 +836,7 @@ int tpc_evbase_loop(tpc_evbase_t* thiz, int flags)
 
 		timeout_process(thiz);
 
-		//TPC_LOGD(("=========333event_count_active %d event cnt %d", thiz->event_count_active, thiz->event_count));
+		TPC_LOGD(("=========333event_count_active %d event cnt %d", thiz->event_count_active, thiz->event_count));
 		if (thiz->event_count_active) {
 			event_process_active(thiz);
 		}
@@ -849,7 +920,7 @@ static int event_thread_notify_default(tpc_evbase_t *thiz)
 		r = write(thiz->th_notify_fd[0], (void*) &msg, sizeof(msg));
 	} while (r < 0 && errno == EAGAIN);
 
-	TPC_LOGD(("notify write msg, ret = %d", r));
+	TPC_LOGD(("notify write msg: %d, ret = %d", msg, r));
 	return (r < 0) ? -1 : 0;
 }
 
@@ -863,7 +934,7 @@ static void event_thread_drain_default(int fd, short what, void *arg)
 	if ( r < 0 && errno != EAGAIN) {
 		TPC_LOGW("Error reading from eventfd");
 	}
-	TPC_LOGD(("read: %d", msg));
+	TPC_LOGD(("notify read msg: %d", msg));
 	TPC_EVACQUIRE_LOCK(thiz, th_base_lock);
 	thiz->is_notify_pending = 0;
 	TPC_EVRELEASE_LOCK(thiz, th_base_lock);

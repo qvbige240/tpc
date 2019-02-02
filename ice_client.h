@@ -102,7 +102,6 @@ typedef struct iclient_callback
 /* Pjsua application data */
 typedef struct pjsua_app_config
 {
-	//sip_context_t		sip_ctx;
 	void				*client;
 	int					is_destroying;
 
@@ -201,6 +200,7 @@ pj_bool_t ice_thread_is_registered(void);
 pj_status_t ice_client_init(ice_info_t *info);
 
 pj_status_t ice_client_register(iclient_callback *ctx);
+pj_status_t ice_client_login(iclient_callback *cb, void *ctx);
 
 pj_status_t ice_make_connect(char *uri);
 

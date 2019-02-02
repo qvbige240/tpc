@@ -11,6 +11,15 @@
 
 TPC_BEGIN_DELS
 
+/** Replacement for offsetof on platforms that don't define it. */
+#ifdef offsetof
+	#define tpc_offsetof(type, field) offsetof(type, field)
+#else
+	#define tpc_offsetof(type, field) ((off_t)(&((type *)0)->field))
+#endif
+
+#define TPC_EVUTIL_UPCAST(ptr, type, field)				\
+	((type *)(((char*)(ptr)) - tpc_offsetof(type, field)))
 
 #ifdef TPC_HAVE_TIMERADD
 #define tpc_timeradd(tvp, uvp, vvp) timeradd((tvp), (uvp), (vvp))

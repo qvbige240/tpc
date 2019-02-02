@@ -205,6 +205,7 @@ static int evmsg_add(tpc_evbase_t *base, int msgfd, short old, short events, voi
 	TPC_EVNOTICE_UNLOCK(priv);
 
 	if (!notice->ev_notice_added) {
+		TPC_LOGI("socketpair = %d", base->notice.ev_notice_pair[1]);
 		if (tpc_event_add(&notice->ev_notice, NULL))
 			goto add_err;
 		notice->ev_notice_added = 1;
@@ -358,7 +359,7 @@ void tpc_evmsg_global_free_locks(tpc_evbase_t *base)
 	struct tpc_notice_info *thiz = &base->notice;
 	DECL_PRIV(thiz, priv);
 
-	TPC_EVTHREAD_FREE_COND(priv->evmsg_lock);
-	TPC_EVTHREAD_FREE_LOCK(priv->evmsg_cond, 0);
+	TPC_EVTHREAD_FREE_COND(priv->evmsg_cond);
+	TPC_EVTHREAD_FREE_LOCK(priv->evmsg_lock, 0);
 }
 #endif

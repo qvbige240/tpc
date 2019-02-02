@@ -35,6 +35,13 @@ TPC_BEGIN_DELS
 #define TPC_EV_PERSIST			0x10
 /** Select edge-triggered behavior, if supported by the backend. */
 #define TPC_EV_ET				0x20
+/**
+ * Moment event: for a short while when activated.
+ *
+ * When a moment event with a timeout becomes activated, its timeout
+ * is reset to 0.
+ */
+#define TPC_EV_MOMENT			0x100
 
 typedef void (*tpc_event_callback)(int fd, short events, void *args);
 
@@ -44,10 +51,13 @@ typedef struct tpc_evbase_t tpc_evbase_t;
 TPCAPI int tpc_event_assign(tpc_events *ev, tpc_evbase_t *base, int fd, short events, tpc_event_callback callback, void *arg);
 TPCAPI int tpc_event_add(tpc_events *ev, const struct timeval *tv);
 TPCAPI int tpc_event_del(tpc_events *ev);
+TPCAPI int tpc_event_pending(const tpc_events *ev, short event, struct timeval *tv);
+TPCAPI int tpc_event_base_set(tpc_evbase_t *base, tpc_events *ev);
 TPCAPI tpc_events *tpc_event_new(tpc_evbase_t *base, int fd, short events, tpc_event_callback callback, void *arg);
 TPCAPI void tpc_event_free(tpc_events *ev);
 TPCAPI char *tpc_event_data_get(tpc_events *ev);
 TPCAPI tpc_evbase_t* tpc_evbase_create(void);
+TPCAPI int tpc_evbase_loopbreak(tpc_evbase_t *thiz);
 TPCAPI int tpc_evbase_loop(tpc_evbase_t* thiz, int flags);
 TPCAPI void tpc_evbase_destroy(tpc_evbase_t* thiz);
 

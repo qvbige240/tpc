@@ -54,7 +54,8 @@ TPC_CFLAGS += -DSIP_SERVER_TEST_ENV
 WEC_LDFLAGS = $(GOLBAL_LDFLAGS) -L$(LIB_PJ)
 
 TARGET = libtpc.so
-SRCS := tpc_endpoints.c  tpc_epoll.c  tpc_event.c  tpc_event_map.c  tpc_event_msg.c  tpc_event_thread.c  tpc_util.c ice_client.c
+#SRCS := tpc_endpoints.c  tpc_epoll.c  tpc_event.c  tpc_event_map.c  tpc_event_msg.c  tpc_event_thread.c  tpc_util.c ice_client.c
+SRCS := ice_client.c tpc_bufferev.c tpc_endpoints.c tpc_event_buffer.c tpc_event_map.c tpc_event_thread.c tpc_bufferev_channel.c tpc_epoll.c tpc_event.c tpc_event_msg.c tpc_util.c
 
 DEPEND_LIB_X86 = $(LIB_PJ)/libpjsua-x86_64-unknown-linux-gnu.a \
 $(LIB_PJ)/libpjsip-ua-x86_64-unknown-linux-gnu.a $(LIB_PJ)/libpjsip-simple-x86_64-unknown-linux-gnu.a \

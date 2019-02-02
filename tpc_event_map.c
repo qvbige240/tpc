@@ -5,9 +5,6 @@
  *
  */
 
-//#include <time.h>
-//#include <sys/time.h>
-
 #include "tpc_event.h"
 #include "tpc_event_map.h"
 
@@ -235,7 +232,12 @@ int tpc_evnotice_add(tpc_evbase_t *base, int msg, tpc_events *ev)
 
 	TAILQ_INSERT_TAIL(&ctx->events, ev, ev_notice_next);
 
-	return 1;
+	if (ev->ev_events & TPC_EV_MOMENT) {
+		TPC_LOGI("add moment_event TPC_EV_MOMENT: %p (fd %d), callback %p", ev, ev->ev_fd, ev->event_callback);
+		base->moment_event = ev;
+		return 1;
+	}
+	return 0;
 }
 
 int tpc_evnotice_del(tpc_evbase_t *base, int msg, tpc_events *ev)
@@ -247,6 +249,11 @@ int tpc_evnotice_del(tpc_evbase_t *base, int msg, tpc_events *ev)
 
 	if (fd >= noticemap->nentries)
 		return -1;
+
+	if (ev->ev_events & TPC_EV_MOMENT) {
+		TPC_LOGI("del moment_event TPC_EV_MOMENT: %p (fd %d), callback %p", ev, ev->ev_fd, ev->event_callback);
+		base->moment_event = NULL;
+	}
 
 	ctx = (struct evmap_notice *)noticemap->entries[fd];
 

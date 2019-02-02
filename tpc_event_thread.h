@@ -143,12 +143,12 @@ int tpc_evthread_locking_enabled(void);
 /** Lock an event base. */
 #define TPC_EVACQUIRE_LOCK(base, lockvar) do {				\
 		TPC_EVLOCK_LOCK((base)->lockvar, 0);			\
-		TPC_LOGD(("%s[%d]: id[%lu]lock ====\n", __FILE__, __LINE__, tpc_evthread_get_id()));          \
+		TPC_LOGD(("%s[%d]: id[%lu]  lock ====", __FILE__, __LINE__, tpc_evthread_get_id()));          \
 	} while (0)
 
 /** Unlock an event base. */
 #define TPC_EVRELEASE_LOCK(base, lockvar) do {				\
-		TPC_LOGD(("%s[%d]: id[%lu]unlock ====\n", __FILE__, __LINE__, tpc_evthread_get_id()));        \
+		TPC_LOGD(("%s[%d]: id[%lu] unlock ====\n", __FILE__, __LINE__, tpc_evthread_get_id()));        \
 		TPC_EVLOCK_UNLOCK((base)->lockvar, 0);			\
 	} while (0)
 

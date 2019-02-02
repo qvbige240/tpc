@@ -8,9 +8,16 @@
 #define TPC_ENDPOINTS_H
 
 #include "tpc_typedef.h"
+#include "tpc_bufferev.h"
 
 TPC_BEGIN_DELS
 
+struct tpc_endpoints_t
+{
+	tpc_evbase_t		*base;
+
+	char				priv[1];
+};
 
 typedef struct tpc_endpoints_data
 {
@@ -38,7 +45,11 @@ typedef struct tpc_endpoints_op
 
 TPCAPI int tpc_endpoints_init(void *uid, int device);
 
+int tpc_endpoints_create(void *uid, int device, void *parent, tpc_endpoints_op *cb, tpc_endpoints_t **endpoints);
+
+/* Deprecated, and replace by tpc_endpoints_login */
 int tpc_endpoints_register(tpc_endpoints_op *callback);
+int tpc_endpoints_login(tpc_endpoints_t *endpoint);
 
 int tpc_endpoints_connect(void *uid);
 
@@ -46,7 +57,7 @@ int tpc_packet_send(const void *pkt, size_t size);
 
 void tpc_endpoints_disconnect(void);
 
-int tpc_endpoints_destroy(void);
+int tpc_endpoints_destroy(tpc_endpoints_t *thiz);
 
 void tpc_endpoints_status(void);
 

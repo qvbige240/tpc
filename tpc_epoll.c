@@ -267,6 +267,13 @@ static int epoll_dispatch(tpc_evbase_t *thiz, struct timeval *tv)
 		}
 	}
 
+	if (thiz->moment_event) {
+		TPC_LOGD(("active moment_event: %p (fd %d), callback %p",
+			thiz->moment_event, thiz->moment_event->ev_fd, thiz->moment_event->event_callback));
+		timeout = 0;
+		tpc_event_active_nolock(thiz->moment_event, TPC_EV_NOTICE, 1);
+	}
+
 	TPC_EVRELEASE_LOCK(thiz, th_base_lock);
 	printf("\n\n\n\n");
 

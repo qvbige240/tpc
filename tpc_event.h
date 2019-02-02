@@ -8,6 +8,7 @@
 #define TPC_EVENT_H
 
 //#include <sys/queue.h>		/* tailq */
+#include <time.h>				/* defined(CLOCK_MONOTONIC), it's important */
 
 #include "tpc_events.h"
 #include "tpc_event_msg.h"
@@ -115,6 +116,7 @@ struct tpc_evbase_t
 	int								event_count_active;
 
 	int								running_loop;
+	int								event_break;
 
 	struct tpc_event_queue			*activequeues;
 	int								nactivequeues;
@@ -127,15 +129,7 @@ struct tpc_evbase_t
 	struct timeval					timer_tv;
 	tpc_minheap_t					timeheap;
 
-#if defined(TPC_HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-	/** 
-	 * Difference between internal time (maybe from clock_gettime) and
-	 * gettimeofday. 
-	 */
-	struct timeval			tv_clock_diff;
-	/** Second in which we last updated tv_clock_diff, in monotonic time. **/
-	time_t					last_updated_clock_diff;
-#endif
+	tpc_events				*moment_event;			/* for transport channel */
 
 	unsigned long			th_owner_id;
 	void					*th_base_lock;
@@ -147,6 +141,17 @@ struct tpc_evbase_t
 	int						th_notify_fd[2];
 	tpc_events				th_notify;
 	int						(*th_notify_func)(tpc_evbase_t *base);
+
+//#if defined(TPC_HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+	/** 
+	 * Difference between internal time (maybe from clock_gettime) and
+	 * gettimeofday. 
+	 */
+	struct timeval			tv_clock_diff;
+	/** Second in which we last updated tv_clock_diff, in monotonic time. **/
+	time_t					last_updated_clock_diff;
+//#endif
+
 };
 
 int tpc_evthread_make_notifiable(tpc_evbase_t *thiz);

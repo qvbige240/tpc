@@ -114,4 +114,36 @@
 
 #endif //TPC_CONFIG_ANDROID
 
+#define TPC_EVUTIL_ASSERT(cond)						\
+	do {								\
+		if (!(cond)) {				\
+			TPC_LOGE(							\
+				"%s:%d: Assertion %s failed in %s",		\
+				__FILE__,__LINE__,#cond,__func__);		\
+			/* In case a user-supplied handler tries to */	\
+			/* return control to us, log and abort here. */	\
+			(void)fprintf(stderr,				\
+					"%s:%d: Assertion %s failed in %s",		\
+					__FILE__,__LINE__,#cond,__func__);		\
+			abort();					\
+		}							\
+	} while (0)
+
+#ifdef _DEBUG
+#define TPC_MEMCPY1(to, from, len)			\
+	do {						\
+		cnt_memcpy++;					\
+		memcpy(to, from, len);				\
+	} while (0)
+
+#define TPC_MEMMOVE1(to, from, len) 			\
+	do {						\
+		cnt_memmove++;					\
+		memmove(to, from, len);				\
+	} while (0)
+#else
+  #define TPC_MEMCPY1		memcpy
+  #define TPC_MEMMOVE1		memmove
+#endif // _DEBUG
+
 #endif //TPC_TYPEDEF_H
